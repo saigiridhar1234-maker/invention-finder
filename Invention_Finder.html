@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invention Finder</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: Inter, Arial, sans-serif;
+    background: linear-gradient(135deg, #0b1020, #172554 55%, #111827);
+    color: #f8fafc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .app {
+    width: min(900px, 100%);
+    background: rgba(15, 23, 42, .92);
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 24px;
+    box-shadow: 0 25px 80px rgba(0,0,0,.35);
+    overflow: hidden;
+  }
+  .header { padding: 28px 32px 18px; }
+  .brand { font-size: 14px; color: #93c5fd; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; }
+  h1 { font-size: clamp(30px, 5vw, 48px); margin: 8px 0; }
+  .subtitle { color: #cbd5e1; line-height: 1.6; margin: 0; }
+  .progress-wrap { padding: 0 32px 26px; }
+  .progress-meta { display:flex; justify-content:space-between; color:#94a3b8; font-size:13px; margin-bottom:8px; }
+  .progress { height: 7px; background:#1e293b; border-radius:99px; overflow:hidden; }
+  .bar { height:100%; width:10%; background:#60a5fa; transition:width .25s ease; }
+  .content { padding: 18px 32px 32px; }
+  .question { display:none; animation: fade .2s ease; }
+  .question.active { display:block; }
+  @keyframes fade { from {opacity:0; transform:translateY(5px)} to {opacity:1; transform:none} }
+  .qnum { color:#60a5fa; font-weight:700; margin-bottom:12px; }
+  h2 { font-size: clamp(23px, 4vw, 34px); line-height:1.25; margin:0 0 12px; }
+  .hint { color:#94a3b8; margin-bottom:20px; line-height:1.5; }
+  textarea {
+    width:100%; min-height:190px; resize:vertical; padding:18px;
+    border-radius:16px; border:1px solid #334155; background:#0b1222;
+    color:#f8fafc; font:inherit; outline:none;
+  }
+  textarea:focus { border-color:#60a5fa; box-shadow:0 0 0 3px rgba(96,165,250,.12); }
+  .actions { display:flex; justify-content:space-between; gap:12px; margin-top:22px; }
+  button {
+    border:0; border-radius:12px; padding:13px 20px; font-weight:700;
+    font-size:15px; cursor:pointer;
+  }
+  .secondary { background:#1e293b; color:#e2e8f0; }
+  .primary { background:#60a5fa; color:#08111f; }
+  button:disabled { opacity:.35; cursor:not-allowed; }
+  .skip { background:transparent; color:#94a3b8; border:1px solid #334155; }
+  #result { display:none; }
+  .result-card {
+    background:#0b1222; border:1px solid #334155; border-radius:18px; padding:24px;
+    margin-top:18px;
+  }
+  .result-card h3 { margin:0 0 10px; color:#bfdbfe; }
+  .result-card p { color:#cbd5e1; line-height:1.65; white-space:pre-wrap; }
+  .answers { margin-top:20px; }
+  .answer-row { padding:13px 0; border-bottom:1px solid #1e293b; }
+  .answer-row strong { display:block; color:#e2e8f0; margin-bottom:5px; }
+  .answer-row span { color:#94a3b8; line-height:1.5; }
+  .restart { margin-top:22px; width:100%; }
+  .small { font-size:12px; color:#64748b; margin-top:14px; }
+  @media(max-width:600px) {
+    body { padding:10px; }
+    .header,.progress-wrap,.content { padding-left:20px; padding-right:20px; }
+    .actions { flex-wrap:wrap; }
+    .actions button { flex:1; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="brand">Invention Finder</div>
+    <h1>What should you invent?</h1>
+    <p class="subtitle">Answer 10 questions. Don't try to sound clever—ordinary frustrations can lead to extraordinary inventions.</p>
+  </div>
+
+  <div class="progress-wrap" id="progressArea">
+    <div class="progress-meta"><span id="progressText">Question 1 of 10</span><span id="percent">10%</span></div>
+    <div class="progress"><div class="bar" id="bar"></div></div>
+  </div>
+
+  <div class="content" id="formArea">
+    <div id="questions"></div>
+    <div class="actions" id="actions">
+      <button class="secondary" id="prev" onclick="previousQuestion()">Previous</button>
+      <button class="skip" onclick="nextQuestion(true)">Skip</button>
+      <button class="primary" id="next" onclick="nextQuestion(false)">Next</button>
+    </div>
+  </div>
+
+  <div class="content" id="result">
+    <div class="qnum">YOUR INVENTION PROFILE</div>
+    <h2>Your starting point for invention</h2>
+    <div class="result-card">
+      <h3>🧠 What your answers reveal</h3>
+      <p id="summary"></p>
+    </div>
+    <div class="result-card">
+      <h3>💡 Your strongest invention direction</h3>
+      <p id="direction"></p>
+    </div>
+    <div class="result-card answers">
+      <h3>📋 Your 10 answers</h3>
+      <div id="answerList"></div>
+    </div>
+    <button class="primary restart" onclick="restart()">Start Again</button>
+    <div class="small">This first version works entirely in your browser. No answers are uploaded anywhere.</div>
+  </div>
+</div>
+
+<script>
+const questions = [
+  ["The Irritation Test", "What is one thing you encounter in daily life that makes you think: “Why is this still so difficult? Someone should have invented a better way to do this?”", "Think about work, home, commuting, technology, education, food, money, cybersecurity, household tasks, or anything else."],
+  ["The Future Test", "If you had unlimited technology and money, what is one thing you wish existed today that doesn't exist—or doesn't work nearly well enough?", "Don't worry about whether it is technically possible."],
+  ["The “I Would Pay for This” Test", "What problem would make you genuinely say: “If someone invented a reliable solution for this, I would pay for it”?", "It can be something you personally need, coworkers need, or millions of people might need."],
+  ["The Impossible Shortcut", "If you could press one button and make one frustrating process happen automatically from beginning to end, what process would you choose?", "Describe what the button would accomplish."],
+  ["The “Why?” Test", "Think of one problem that has existed for years where people have accepted the inconvenience instead of truly solving it. Why can't we solve it properly?", "It can be a tiny problem or a massive one."],
+  ["The Human Superpower Test", "If you could invent a device or technology that gives an ordinary person one extraordinary ability, what would you choose?", "Examples: learn faster, detect danger earlier, understand any language, remember everything, or predict machine failure."],
+  ["The 10× Improvement Test", "Take something that already exists and imagine making it 10× better. What would you completely redesign?", "It could be a phone, laptop, car, medical device, cybersecurity tool, appliance, wallet, chair, umbrella, or anything else."],
+  ["The Millions of People Test", "What problem do you believe millions of people face that nobody has solved properly yet?", "Think about safety, healthcare, education, cybersecurity, aging, transportation, energy, food, pollution, accessibility, finance, or anything else."],
+  ["The “Combine Two Worlds” Test", "Choose two areas and imagine combining them. What might that combination create?", "Examples: AI + home, cybersecurity + AI, brain + computer, healthcare + wearables, education + gaming, agriculture + robotics."],
+  ["The Legacy Test", "Imagine it is 20 years from now. You invented something successful that improved people's lives. What made you decide to invent it?", "Complete this thought: “I invented it because I wanted to…”"]
+];
+
+let current = 0;
+const answers = Array(questions.length).fill("");
+
+function render() {
+  const container = document.getElementById("questions");
+  container.innerHTML = questions.map((q, i) => `
+    <section class="question ${i === current ? "active" : ""}">
+      <div class="qnum">QUESTION ${i + 1}</div>
+      <h2>${q[0]}</h2>
+      <div class="hint">${q[1]}<br><br>${q[2]}</div>
+      <textarea id="answer-${i}" placeholder="Write whatever comes to mind...">${answers[i]}</textarea>
+    </section>
+  `).join("");
+  updateUI();
+}
+
+function saveCurrent() {
+  const box = document.getElementById(`answer-${current}`);
+  if (box) answers[current] = box.value.trim();
+}
+
+function updateUI() {
+  const pct = Math.round(((current + 1) / questions.length) * 100);
+  document.getElementById("progressText").textContent = `Question ${current + 1} of ${questions.length}`;
+  document.getElementById("percent").textContent = `${pct}%`;
+  document.getElementById("bar").style.width = `${pct}%`;
+  document.getElementById("prev").disabled = current === 0;
+  document.getElementById("next").textContent = current === questions.length - 1 ? "Create Profile" : "Next";
+}
+
+function nextQuestion(skip) {
+  saveCurrent();
+  if (!skip && !answers[current]) {
+    const box = document.getElementById(`answer-${current}`);
+    box.focus();
+    box.style.borderColor = "#f59e0b";
+    setTimeout(() => box.style.borderColor = "", 700);
+    return;
+  }
+  if (current < questions.length - 1) {
+    current++;
+    render();
+  } else {
+    showResult();
+  }
+}
+
+function previousQuestion() {
+  saveCurrent();
+  if (current > 0) { current--; render(); }
+}
+
+function showResult() {
+  saveCurrent();
+  document.getElementById("formArea").style.display = "none";
+  document.getElementById("progressArea").style.display = "none";
+  document.getElementById("result").style.display = "block";
+
+  const filled = answers.filter(Boolean);
+  const text = filled.join(" ");
+  const words = text.toLowerCase();
+
+  let direction = "You are exploring a real-world problem that could potentially become an invention. Your next step is to identify the most repeated pain point across your answers and turn it into a specific problem statement.";
+
+  const signals = [];
+  if (/ai|artificial intelligence|automation|robot|machine learning/.test(words)) signals.push("AI / automation");
+  if (/cyber|security|hack|vulnerab|privacy/.test(words)) signals.push("cybersecurity / digital safety");
+  if (/health|medical|doctor|disease|hospital|elder/.test(words)) signals.push("healthcare / wellbeing");
+  if (/learn|education|school|student|knowledge/.test(words)) signals.push("education / learning");
+  if (/home|house|family|kitchen|clean|cook/.test(words)) signals.push("home / everyday life");
+  if (/car|travel|traffic|transport|commute/.test(words)) signals.push("mobility / transportation");
+  if (/energy|solar|water|pollution|climate|environment/.test(words)) signals.push("environment / energy");
+
+  if (signals.length) {
+    direction = `Your answers show strong signals around ${[...new Set(signals)].slice(0,3).join(", ")}. Look for the problem that appears repeatedly across your answers. That recurring problem is a stronger invention candidate than a single flashy idea.`;
+  }
+
+  document.getElementById("summary").textContent =
+    `You provided ${filled.length} of 10 answers. The goal of this exercise is not to find a perfect invention immediately; it is to uncover recurring problems, desired capabilities, and opportunities for a 10× improvement.`;
+
+  document.getElementById("direction").textContent = direction;
+
+  document.getElementById("answerList").innerHTML = questions.map((q, i) => `
+    <div class="answer-row">
+      <strong>${i + 1}. ${q[0]}</strong>
+      <span>${answers[i] || "Skipped"}</span>
+    </div>
+  `).join("");
+}
+
+function restart() {
+  current = 0;
+  answers.fill("");
+  document.getElementById("result").style.display = "none";
+  document.getElementById("formArea").style.display = "block";
+  document.getElementById("progressArea").style.display = "block";
+  render();
+}
+
+render();
+</script>
+</body>
+</html>
